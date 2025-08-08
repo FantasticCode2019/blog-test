@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block content %}
-<h1>Latest Posts</h1>
+<h1>{{ heading or 'Posts' }}</h1>
 <div class="post-list">
   {% for post in posts %}
   <article class="post-item">
@@ -10,25 +10,21 @@
     {% else %}
       <p class="summary">No summary.</p>
     {% endif %}
-    <div class="meta">
-      {{ post.created_at.strftime('%Y-%m-%d') }}
-      {% if post.category %} · <a href="/category/{{ post.category.slug }}">{{ post.category.name }}</a>{% endif %}
-      {% if post.tags %} · {% for t in post.tags %}<a class="tag" href="/tag/{{ t.slug }}">{{ t.name }}</a>{% endfor %}{% endif %}
-    </div>
+    <div class="meta">{{ post.created_at.strftime('%Y-%m-%d') }}</div>
   </article>
   {% else %}
-    <p>No posts yet.</p>
+    <p>No posts found.</p>
   {% endfor %}
 </div>
 
 {% if total_pages > 1 %}
 <nav class="pagination">
   {% if page > 1 %}
-    <a href="/?page={{ page-1 }}" class="page">Prev</a>
+    <a href="?page={{ page-1 }}" class="page">Prev</a>
   {% endif %}
   <span class="page current">Page {{ page }} / {{ total_pages }}</span>
   {% if page < total_pages %}
-    <a href="/?page={{ page+1 }}" class="page">Next</a>
+    <a href="?page={{ page+1 }}" class="page">Next</a>
   {% endif %}
 </nav>
 {% endif %}

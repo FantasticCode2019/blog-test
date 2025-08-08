@@ -4,15 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{{ title or 'Blog' }} - Blog</title>
+  <meta name="description" content="{{ meta_description or 'A simple FastAPI blog' }}" />
+  <meta property="og:title" content="{{ title or 'Blog' }}" />
+  <meta property="og:description" content="{{ meta_description or 'A simple FastAPI blog' }}" />
   <link rel="stylesheet" href="/static/styles.css" />
+  {% block head %}{% endblock %}
 </head>
 <body>
   <header class="site-header">
-    <nav class="container">
+    <nav class="container nav">
       <a href="/" class="brand">My Blog</a>
       <div class="nav-links">
+        <a href="/categories">Categories</a>
+        <a href="/tags">Tags</a>
         <a href="/admin">Admin</a>
       </div>
+      <form action="/search" method="get" class="search">
+        <input type="search" name="q" placeholder="Search..." value="{{ request.query_params.get('q') if request and request.query_params else '' }}" />
+      </form>
     </nav>
   </header>
 

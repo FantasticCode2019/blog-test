@@ -6,11 +6,13 @@ A simple, production-ready blog website built with FastAPI, SQLAlchemy (SQLite),
 - Public site
   - Home page with latest posts and pagination
   - Post detail pages with SEO-friendly slugs
-  - Categories and tags browsing
+  - Categories and tags browsing and detail pages with pagination
+  - Full-text like search across title/summary/content
 - Admin dashboard
   - Sign in/out (session cookies)
   - CRUD for posts, categories, and tags
   - Draft/publish toggle
+  - Media uploads page for images (served from `/static/uploads`)
 - Architecture designed for clarity and extensibility
 
 ## Tech Stack
@@ -31,16 +33,19 @@ blogsite/
     models.py              # SQLAlchemy ORM models
     auth.py                # Auth routes and utilities
     deps.py                # Shared dependencies (auth guards, pagination)
-    utils.py               # Helpers (slugs, time)
+    utils.py               # Helpers (slugs, time, unique slugs)
     routers/
-      posts.py             # Public & admin post routes
-      categories.py        # Admin CRUD for categories + public listing
-      tags.py              # Admin CRUD for tags + public listing
+      posts.py             # Public & admin post routes + search + uploads
+      categories.py        # Admin CRUD + public listing/detail
+      tags.py              # Admin CRUD + public listing/detail
     templates/
       base.html
       index.html
+      list.html
       post_detail.html
       login.html
+      categories.html
+      tags.html
       admin/
         dashboard.html
         posts.html
@@ -49,8 +54,10 @@ blogsite/
         category_form.html
         tags.html
         tag_form.html
+        uploads.html
     static/
       styles.css
+      uploads/            # created at runtime
   requirements.txt
 ```
 
@@ -101,16 +108,9 @@ Environment variables:
 - `BLOG_ADMIN_USERNAME` (default: `admin`)
 - `BLOG_ADMIN_PASSWORD` (default: `admin123`)
 
-## Scripts
-
-- Format (optional): use your preferred formatter. The project keeps code readable and explicit.
-
-## Architecture & Design
-
-- Layered modules: `models` (data), `database` (persistence), `routers` (HTTP), `auth` (sessions), `deps` (shared dependencies), `utils` (helpers)
-- Clear separation between public routes and admin routes using dependency guards
-- SQLAlchemy 2.0 style with sessionmaker; simple auto-migrations by creating tables on startup
-- Server-rendered templates for simplicity and SEO
+## Tips
+- Image uploads are saved to `app/static/uploads/`. Use the uploaded URL in post content.
+- Slugs are automatically made unique when you rename posts/categories/tags.
 
 ## Tests
 

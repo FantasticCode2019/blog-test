@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Uploads</h1>
+{% if error %}
+  <div class="alert">{{ error }}</div>
+{% endif %}
+{% if uploaded_url %}
+  <div class="alert">Uploaded: <a href="{{ uploaded_url }}" target="_blank">{{ uploaded_url }}</a></div>
+{% endif %}
+<form method="post" action="/admin/uploads" enctype="multipart/form-data" class="form">
+  <label>Image File
+    <input type="file" name="file" accept="image/*" required />
+  </label>
+  <button type="submit">Upload</button>
+</form>
+
+<h2>Files</h2>
+<ul class="list-grid">
+  {% for f in files %}
+  <li><a href="{{ f.url }}" target="_blank">{{ f.name }}</a></li>
+  {% else %}
+  <li>No files.</li>
+  {% endfor %}
+</ul>
+{% endblock %}
