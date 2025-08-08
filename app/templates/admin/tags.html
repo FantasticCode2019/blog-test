@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Tags</h1>
+<a class="btn" href="/admin/tags/new">New Tag</a>
+<table class="table">
+  <thead>
+    <tr><th>ID</th><th>Name</th><th>Slug</th><th>Actions</th></tr>
+  </thead>
+  <tbody>
+    {% for t in tags %}
+    <tr>
+      <td>{{ t.id }}</td>
+      <td>{{ t.name }}</td>
+      <td>{{ t.slug }}</td>
+      <td>
+        <a href="/admin/tags/{{ t.id }}">Edit</a>
+        <form method="post" action="/admin/tags/{{ t.id }}/delete" style="display:inline">
+          <button type="submit" onclick="return confirm('Delete?')">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Latest Posts</h1>
+<div class="post-list">
+  {% for post in posts %}
+  <article class="post-item">
+    <h2><a href="/post/{{ post.slug }}">{{ post.title }}</a></h2>
+    {% if post.summary %}
+      <p class="summary">{{ post.summary }}</p>
+    {% else %}
+      <p class="summary">No summary.</p>
+    {% endif %}
+    <div class="meta">{{ post.created_at.strftime('%Y-%m-%d') }}</div>
+  </article>
+  {% else %}
+    <p>No posts yet.</p>
+  {% endfor %}
+</div>
+
+{% if total_pages > 1 %}
+<nav class="pagination">
+  {% if page > 1 %}
+    <a href="/?page={{ page-1 }}" class="page">Prev</a>
+  {% endif %}
+  <span class="page current">Page {{ page }} / {{ total_pages }}</span>
+  {% if page < total_pages %}
+    <a href="/?page={{ page+1 }}" class="page">Next</a>
+  {% endif %}
+</nav>
+{% endif %}
+{% endblock %}

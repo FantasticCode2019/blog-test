@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>{{ 'Edit Tag' if tag else 'New Tag' }}</h1>
+<form method="post" action="{{ '/admin/tags/' + str(tag.id) if tag else '/admin/tags/new' }}" class="form">
+  <label>Name
+    <input type="text" name="name" value="{{ tag.name if tag else '' }}" required />
+  </label>
+  <button type="submit">Save</button>
+</form>
+{% endblock %}

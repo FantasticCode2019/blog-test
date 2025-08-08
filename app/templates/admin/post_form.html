@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>{{ 'Edit Post' if post else 'New Post' }}</h1>
+<form method="post" action="{{ '/admin/posts/' + str(post.id) if post else '/admin/posts/new' }}" class="form">
+  <label>Title
+    <input type="text" name="title" value="{{ post.title if post else '' }}" required />
+  </label>
+  <label>Summary
+    <input type="text" name="summary" value="{{ post.summary if post else '' }}" />
+  </label>
+  <label>Content
+    <textarea name="content" rows="12" required>{{ post.content if post else '' }}</textarea>
+  </label>
+  <label>Published
+    <input type="checkbox" name="is_published" value="1" {% if post and post.is_published %}checked{% endif %} />
+  </label>
+  <label>Category
+    <select name="category_id">
+      <option value="">-- None --</option>
+      {% for c in categories %}
+      <option value="{{ c.id }}" {% if post and post.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Tags
+    <select name="tag_ids" multiple size="5">
+      {% for t in tags %}
+      <option value="{{ t.id }}" {% if post and t in post.tags %}selected{% endif %}>{{ t.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button type="submit">Save</button>
+</form>
+{% endblock %}

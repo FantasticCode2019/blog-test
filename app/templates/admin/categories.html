@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Categories</h1>
+<a class="btn" href="/admin/categories/new">New Category</a>
+<table class="table">
+  <thead>
+    <tr><th>ID</th><th>Name</th><th>Slug</th><th>Actions</th></tr>
+  </thead>
+  <tbody>
+    {% for c in categories %}
+    <tr>
+      <td>{{ c.id }}</td>
+      <td>{{ c.name }}</td>
+      <td>{{ c.slug }}</td>
+      <td>
+        <a href="/admin/categories/{{ c.id }}">Edit</a>
+        <form method="post" action="/admin/categories/{{ c.id }}/delete" style="display:inline">
+          <button type="submit" onclick="return confirm('Delete?')">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
