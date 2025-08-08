@@ -8,10 +8,10 @@
     <h1>{{ post.title }}</h1>
     <div class="meta">{{ post.created_at.strftime('%Y-%m-%d') }}</div>
     {% if post.category %}
-      <div class="meta">Category: {{ post.category.name }}</div>
+      <div class="meta">Category: <a href="/category/{{ post.category.slug }}">{{ post.category.name }}</a></div>
     {% endif %}
     {% if post.tags %}
-      <div class="meta">Tags: {% for t in post.tags %}<span class="tag">{{ t.name }}</span>{% endfor %}</div>
+      <div class="meta">Tags: {% for t in post.tags %}<a class="tag" href="/tag/{{ t.slug }}">{{ t.name }}</a>{% endfor %}</div>
     {% endif %}
     <div class="content">{{ post.content | safe }}</div>
   </article>

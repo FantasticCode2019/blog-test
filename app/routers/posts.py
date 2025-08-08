@@ -1,12 +1,13 @@
 from typing import Optional, List
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Request, UploadFile, File
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from pathlib import Path
 
 from ..database import get_db_session
 from ..models import Post, Category, Tag
-from ..utils import generate_slug, paginate
+from ..utils import generate_slug, paginate, generate_unique_slug
 from ..deps import require_admin
 
 router = APIRouter()
@@ -46,7 +47,39 @@ def post_detail(request: Request, slug: str):
                 "post_detail.html", {"request": request, "error": "Post not found", "title": "Not Found"}, status_code=404
             )
         return request.app.state.templates.TemplateResponse(
-            "post_detail.html", {"request": request, "post": post, "title": post.title}
+            "post_detail.html", {"request": request, "post": post, "title": post.title, "meta_description": post.summary or ""}
+        )
+
+
+# Public search
+@router.get("/search")
+def search(request: Request, q: Optional[str] = None, page: int = 1, page_size: int = 10):
+    query_text = (q or "").strip()
+    posts = []
+    total_pages = 1
+    with get_db_session() as db:
+        if query_text:
+            base_query = db.query(Post).filter(
+                Post.is_published == True,  # noqa: E712
+                func.lower(Post.title).like(f"%{query_text.lower()}%")
+                | func.lower(func.coalesce(Post.summary, "")).like(f"%{query_text.lower()}%")
+                | func.lower(Post.content).like(f"%{query_text.lower()}%")
+            )
+            total_posts = base_query.count()
+            total_pages, page, offset = paginate(total_posts, page, page_size)
+            posts = (
+                base_query.order_by(Post.created_at.desc()).offset(offset).limit(page_size).all()
+            )
+        return request.app.state.templates.TemplateResponse(
+            "list.html",
+            {
+                "request": request,
+                "posts": posts,
+                "page": page,
+                "total_pages": total_pages,
+                "title": "Search",
+                "heading": f"Search results for \"{query_text}\"" if query_text else "Search",
+            },
         )
 
 
@@ -91,7 +124,7 @@ def create_post(
     with get_db_session() as db:
         post = Post(
             title=title,
-            slug=generate_slug(title),
+            slug=generate_unique_slug(db, Post, title),
             summary=summary,
             content=content,
             is_published=bool(is_published),
@@ -132,7 +165,7 @@ def update_post(
         if not post:
             return RedirectResponse("/admin/posts", status_code=302)
         post.title = title
-        post.slug = generate_slug(title)
+        post.slug = generate_unique_slug(db, Post, title, exclude_id=post.id)
         post.summary = summary
         post.content = content
         post.is_published = bool(is_published)
@@ -149,3 +182,53 @@ def delete_post(request: Request, post_id: int):
         if post:
             db.delete(post)
         return RedirectResponse("/admin/posts", status_code=302)
+
+
+# Admin uploads
+@router.get("/admin/uploads", dependencies=[Depends(require_admin)])
+def uploads_page(request: Request):
+    uploads_dir = Path(__file__).resolve().parent.parent / "static" / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    files = []
+    for p in sorted(uploads_dir.glob("*")):
+        if p.is_file():
+            files.append({"name": p.name, "url": f"/static/uploads/{p.name}"})
+    return request.app.state.templates.TemplateResponse(
+        "admin/uploads.html",
+        {"request": request, "title": "Uploads", "files": files},
+    )
+
+
+@router.post("/admin/uploads", dependencies=[Depends(require_admin)])
+def handle_upload(request: Request, file: UploadFile = File(...)):
+    uploads_dir = Path(__file__).resolve().parent.parent / "static" / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    content_type = file.content_type or ""
+    if not content_type.startswith("image/"):
+        return request.app.state.templates.TemplateResponse(
+            "admin/uploads.html",
+            {"request": request, "title": "Uploads", "error": "Only image files are allowed.", "files": []},
+            status_code=400,
+        )
+    # Sanitize filename
+    original_name = Path(file.filename or "upload").name
+    stem = original_name.rsplit(".", 1)[0]
+    ext = ("." + original_name.rsplit(".", 1)[1]) if "." in original_name else ""
+    safe_stem = generate_slug(stem)
+    candidate = f"{safe_stem}{ext}"
+    i = 1
+    while (uploads_dir / candidate).exists():
+        candidate = f"{safe_stem}-{i}{ext}"
+        i += 1
+    dest_path = uploads_dir / candidate
+    with dest_path.open("wb") as out:
+        out.write(file.file.read())
+    file_url = f"/static/uploads/{candidate}"
+    files = []
+    for p in sorted(uploads_dir.glob("*")):
+        if p.is_file():
+            files.append({"name": p.name, "url": f"/static/uploads/{p.name}"})
+    return request.app.state.templates.TemplateResponse(
+        "admin/uploads.html",
+        {"request": request, "title": "Uploads", "files": files, "uploaded_url": file_url},
+    )

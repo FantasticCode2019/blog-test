@@ -11,23 +11,28 @@
 body {
   margin: 0; background: var(--bg); color: var(--text);
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
-  line-height: 1.6;
+  line-height: 1.75;
 }
 .container { max-width: 960px; margin: 0 auto; padding: 1rem; }
 .site-header { background: var(--panel); border-bottom: 1px solid #1c2230; }
 .site-header .brand { color: var(--text); text-decoration: none; font-weight: 700; }
-.nav-links a { color: var(--muted); margin-left: 1rem; text-decoration: none; }
+.nav { display: flex; align-items: center; gap: 1rem; }
+.nav .nav-links { margin-left: auto; display: flex; gap: 1rem; }
+.nav-links a { color: var(--muted); text-decoration: none; }
+.nav .search input[type="search"] {
+  background: #0e1320; color: var(--text); border: 1px solid #1c2230; border-radius: 6px; padding: 0.4rem 0.6rem;
+}
 .site-footer { border-top: 1px solid #1c2230; color: var(--muted); padding: 2rem 0; margin-top: 3rem; }
 
 h1, h2, h3 { line-height: 1.25; }
 .post-list .post-item { padding: 1rem 0; border-bottom: 1px solid #1c2230; }
 .post-list .summary { color: var(--muted); }
 .meta { color: var(--muted); font-size: 0.9rem; margin: 0.25rem 0; }
-.tag { background: #1c2230; padding: 0.1rem 0.5rem; margin-right: 0.25rem; border-radius: 4px; }
+.tag { background: #1c2230; padding: 0.1rem 0.5rem; margin-right: 0.25rem; border-radius: 4px; color: var(--text); text-decoration: none; }
 
 .form label { display: block; margin-bottom: 1rem; }
-.form input[type="text"], .form input[type="password"], .form textarea, .form select {
-  width: 100%; padding: 0.6rem 0.7rem; border-radius: 6px; border: 1px solid #1c2230; background: #0e1320; color: var(--text);
+.form input[type="text"], .form input[type="password"], .form textarea, .form select, .form input[type="file"], .nav .search input[type="search"] {
+  width: 100%; max-width: 380px; padding: 0.6rem 0.7rem; border-radius: 6px; border: 1px solid #1c2230; background: #0e1320; color: var(--text);
 }
 .form button, .btn, .table button {
   background: var(--primary); color: white; border: 0; padding: 0.5rem 0.8rem; border-radius: 6px; cursor: pointer;
@@ -37,3 +42,15 @@ h1, h2, h3 { line-height: 1.25; }
 .alert { color: white; background: #7c3aed; padding: 0.5rem 0.8rem; border-radius: 6px; margin-bottom: 1rem; }
 .pagination .page { color: white; text-decoration: none; margin-right: 0.5rem; }
 .pagination .current { color: var(--muted); }
+
+/* Typography for post content */
+.content { font-size: 1.05rem; }
+.content p { margin: 1rem 0; }
+.content a { color: #93c5fd; }
+.content pre { background: #0e1320; padding: 1rem; border-radius: 6px; overflow: auto; }
+.content code { background: #0e1320; padding: 0.1rem 0.3rem; border-radius: 4px; }
+
+/* Simple list grid */
+.list-grid { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.5rem 1rem; }
+.list-grid li { padding: 0.25rem 0; }
+.muted { color: var(--muted); }
