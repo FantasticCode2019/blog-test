@@ -16,3 +16,18 @@ def require_admin(request: Request):
         # Redirect to login
         raise HTTPException(status_code=status.HTTP_302_FOUND, headers={"Location": "/login"})
     return user
+
+
+def require_user(request: Request):
+    user = request.session.get("user")
+    if not user:
+        raise HTTPException(status_code=status.HTTP_302_FOUND, headers={"Location": "/login"})
+    return user
+
+
+def get_api_token() -> str:
+    return os.getenv("API_TOKEN", "")
+
+
+def get_site_base_url() -> str:
+    return os.getenv("SITE_BASE_URL", "http://localhost:8000")

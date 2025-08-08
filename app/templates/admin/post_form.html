@@ -1,15 +1,23 @@
 {% extends 'base.html' %}
+{% block head %}
+  <link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
+  <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+{% endblock %}
 {% block content %}
 <h1>{{ 'Edit Post' if post else 'New Post' }}</h1>
-<form method="post" action="{{ '/admin/posts/' + str(post.id) if post else '/admin/posts/new' }}" class="form">
+<form id="post-form" method="post" action="{{ '/admin/posts/' + str(post.id) if post else '/admin/posts/new' }}" class="form">
+  <input type="hidden" name="content_format" value="{{ post.content_format if post else 'markdown' }}" />
   <label>Title
     <input type="text" name="title" value="{{ post.title if post else '' }}" required />
   </label>
   <label>Summary
     <input type="text" name="summary" value="{{ post.summary if post else '' }}" />
   </label>
+  <label>Cover Image URL
+    <input type="text" name="cover_image_url" value="{{ post.cover_image_url if post else '' }}" placeholder="https://..." />
+  </label>
   <label>Content
-    <textarea name="content" rows="12" required>{{ post.content if post else '' }}</textarea>
+    <textarea id="editor" name="content" rows="16" required>{{ post.content if post else '' }}</textarea>
   </label>
   <label>Published
     <input type="checkbox" name="is_published" value="1" {% if post and post.is_published %}checked{% endif %} />
@@ -29,6 +37,56 @@
       {% endfor %}
     </select>
   </label>
-  <button type="submit">Save</button>
+  <div style="display:flex; gap:8px; align-items:center;">
+    <button type="submit">Save</button>
+    {% if post %}
+    <a class="button" href="/admin/posts/{{ post.id }}/preview" target="_blank">Preview</a>
+    {% endif %}
+    <span id="autosave-status" style="font-size:12px;color:#666;"></span>
+  </div>
 </form>
+<script>
+  const easyMDE = new EasyMDE({ element: document.getElementById('editor'), spellChecker: false, autosave: false });
+  const form = document.getElementById('post-form');
+  let lastSavedId = {{ post.id if post else 'null' }};
+  let saving = false;
+  const statusEl = document.getElementById('autosave-status');
+
+  async function autosave() {
+    if (saving) return;
+    saving = true;
+    statusEl.textContent = 'Saving...';
+    const formData = new FormData(form);
+    formData.set('content', easyMDE.value());
+    const payload = Object.fromEntries(formData.entries());
+    if (lastSavedId) payload.id = lastSavedId;
+    // Convert multi-select tag_ids to array
+    if (payload.tag_ids) {
+      const tagSelect = form.querySelector('select[name="tag_ids"]');
+      payload.tag_ids = Array.from(tagSelect.selectedOptions).map(o => Number(o.value));
+    }
+    payload.is_published = !!form.querySelector('input[name="is_published"]:checked');
+    try {
+      const res = await fetch('/admin/posts/autosave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data && data.ok) {
+        lastSavedId = data.id;
+        statusEl.textContent = 'Saved';
+      } else {
+        statusEl.textContent = 'Save failed';
+      }
+    } catch (e) {
+      statusEl.textContent = 'Save error';
+    } finally {
+      saving = false;
+      setTimeout(() => { statusEl.textContent = ''; }, 3000);
+    }
+  }
+
+  setInterval(autosave, 5000);
+</script>
 {% endblock %}

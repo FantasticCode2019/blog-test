@@ -1,14 +1,20 @@
 from typing import Optional, List
 from fastapi import APIRouter, Depends, Form, Request, UploadFile, File
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pathlib import Path
+import json
+try:
+    import markdown2  # type: ignore
+except Exception:  # pragma: no cover
+    markdown2 = None
 
 from ..database import get_db_session
 from ..models import Post, Category, Tag
 from ..utils import generate_slug, paginate, generate_unique_slug
-from ..deps import require_admin
+from ..deps import require_admin, get_site_base_url
+from ..storage import get_storage
 
 router = APIRouter()
 
@@ -46,8 +52,22 @@ def post_detail(request: Request, slug: str):
             return request.app.state.templates.TemplateResponse(
                 "post_detail.html", {"request": request, "error": "Post not found", "title": "Not Found"}, status_code=404
             )
+        # Render markdown if needed
+        content_html = post.content
+        try:
+            if getattr(post, "content_format", "html") == "markdown" and markdown2:
+                content_html = markdown2.markdown(post.content, extras=["fenced-code-blocks", "tables", "strike", "toc"])
+        except Exception:
+            content_html = post.content
         return request.app.state.templates.TemplateResponse(
-            "post_detail.html", {"request": request, "post": post, "title": post.title, "meta_description": post.summary or ""}
+            "post_detail.html",
+            {
+                "request": request,
+                "post": post,
+                "content_html": content_html,
+                "title": post.title,
+                "meta_description": post.summary or "",
+            },
         )
 
 
@@ -117,6 +137,8 @@ def create_post(
     title: str = Form(...),
     summary: Optional[str] = Form(None),
     content: str = Form(...),
+    content_format: str = Form("markdown"),
+    cover_image_url: Optional[str] = Form(None),
     is_published: Optional[bool] = Form(False),
     category_id: Optional[int] = Form(None),
     tag_ids: Optional[List[int]] = Form(None),
@@ -127,6 +149,8 @@ def create_post(
             slug=generate_unique_slug(db, Post, title),
             summary=summary,
             content=content,
+            content_format=content_format,
+            cover_image_url=cover_image_url,
             is_published=bool(is_published),
             category_id=category_id,
         )
@@ -156,6 +180,8 @@ def update_post(
     title: str = Form(...),
     summary: Optional[str] = Form(None),
     content: str = Form(...),
+    content_format: str = Form("markdown"),
+    cover_image_url: Optional[str] = Form(None),
     is_published: Optional[bool] = Form(False),
     category_id: Optional[int] = Form(None),
     tag_ids: Optional[List[int]] = Form(None),
@@ -168,6 +194,8 @@ def update_post(
         post.slug = generate_unique_slug(db, Post, title, exclude_id=post.id)
         post.summary = summary
         post.content = content
+        post.content_format = content_format
+        post.cover_image_url = cover_image_url
         post.is_published = bool(is_published)
         post.category_id = category_id
         post.tags = db.query(Tag).filter(Tag.id.in_(tag_ids)).all() if tag_ids else []
@@ -184,25 +212,89 @@ def delete_post(request: Request, post_id: int):
         return RedirectResponse("/admin/posts", status_code=302)
 
 
-# Admin uploads
+# Preview unpublished post for admins
+@router.get("/admin/posts/{post_id}/preview", dependencies=[Depends(require_admin)])
+def preview_post(request: Request, post_id: int):
+    with get_db_session() as db:
+        post = db.get(Post, post_id)
+        if not post:
+            return request.app.state.templates.TemplateResponse(
+                "post_detail.html", {"request": request, "error": "Post not found", "title": "Not Found"}, status_code=404
+            )
+        content_html = post.content
+        try:
+            if getattr(post, "content_format", "html") == "markdown" and markdown2:
+                content_html = markdown2.markdown(post.content, extras=["fenced-code-blocks", "tables", "strike", "toc"])
+        except Exception:
+            content_html = post.content
+        return request.app.state.templates.TemplateResponse(
+            "post_detail.html",
+            {
+                "request": request,
+                "post": post,
+                "content_html": content_html,
+                "title": post.title,
+                "meta_description": post.summary or "",
+            },
+        )
+
+
+# Autosave draft endpoint
+@router.post("/admin/posts/autosave", dependencies=[Depends(require_admin)])
+async def autosave_post(request: Request):
+    payload = await request.json()
+    post_id = payload.get("id")
+    with get_db_session() as db:
+        if post_id:
+            post = db.get(Post, int(post_id))
+        else:
+            post = None
+        title = payload.get("title") or "Untitled"
+        content = payload.get("content") or ""
+        summary = payload.get("summary")
+        content_format = payload.get("content_format") or "markdown"
+        cover_image_url = payload.get("cover_image_url")
+        category_id = payload.get("category_id")
+        tag_ids = payload.get("tag_ids") or []
+        is_published = bool(payload.get("is_published") or False)
+        if not post:
+            post = Post(
+                title=title,
+                slug=generate_unique_slug(db, Post, title),
+                summary=summary,
+                content=content,
+                content_format=content_format,
+                cover_image_url=cover_image_url,
+                is_published=is_published,
+                category_id=category_id,
+            )
+        else:
+            post.title = title
+            post.slug = generate_unique_slug(db, Post, title, exclude_id=post.id)
+            post.summary = summary
+            post.content = content
+            post.content_format = content_format
+            post.cover_image_url = cover_image_url
+            post.is_published = is_published
+            post.category_id = category_id
+            post.tags = db.query(Tag).filter(Tag.id.in_(tag_ids)).all() if tag_ids else []
+        db.add(post)
+        db.flush()
+        return {"ok": True, "id": post.id}
+
+
+# Admin uploads using storage backend
 @router.get("/admin/uploads", dependencies=[Depends(require_admin)])
 def uploads_page(request: Request):
-    uploads_dir = Path(__file__).resolve().parent.parent / "static" / "uploads"
-    uploads_dir.mkdir(parents=True, exist_ok=True)
-    files = []
-    for p in sorted(uploads_dir.glob("*")):
-        if p.is_file():
-            files.append({"name": p.name, "url": f"/static/uploads/{p.name}"})
+    # For S3, we cannot list without permissions; keep page simple
     return request.app.state.templates.TemplateResponse(
         "admin/uploads.html",
-        {"request": request, "title": "Uploads", "files": files},
+        {"request": request, "title": "Uploads", "files": []},
     )
 
 
 @router.post("/admin/uploads", dependencies=[Depends(require_admin)])
 def handle_upload(request: Request, file: UploadFile = File(...)):
-    uploads_dir = Path(__file__).resolve().parent.parent / "static" / "uploads"
-    uploads_dir.mkdir(parents=True, exist_ok=True)
     content_type = file.content_type or ""
     if not content_type.startswith("image/"):
         return request.app.state.templates.TemplateResponse(
@@ -210,25 +302,77 @@ def handle_upload(request: Request, file: UploadFile = File(...)):
             {"request": request, "title": "Uploads", "error": "Only image files are allowed.", "files": []},
             status_code=400,
         )
-    # Sanitize filename
-    original_name = Path(file.filename or "upload").name
-    stem = original_name.rsplit(".", 1)[0]
-    ext = ("." + original_name.rsplit(".", 1)[1]) if "." in original_name else ""
-    safe_stem = generate_slug(stem)
-    candidate = f"{safe_stem}{ext}"
-    i = 1
-    while (uploads_dir / candidate).exists():
-        candidate = f"{safe_stem}-{i}{ext}"
-        i += 1
-    dest_path = uploads_dir / candidate
-    with dest_path.open("wb") as out:
-        out.write(file.file.read())
-    file_url = f"/static/uploads/{candidate}"
-    files = []
-    for p in sorted(uploads_dir.glob("*")):
-        if p.is_file():
-            files.append({"name": p.name, "url": f"/static/uploads/{p.name}"})
+    storage = get_storage()
+    data = file.file.read()
+    file_url = storage.save_file(data, content_type, file.filename or "upload")
     return request.app.state.templates.TemplateResponse(
         "admin/uploads.html",
-        {"request": request, "title": "Uploads", "files": files, "uploaded_url": file_url},
+        {"request": request, "title": "Uploads", "files": [], "uploaded_url": file_url},
     )
+
+
+# RSS feed
+@router.get("/rss.xml", include_in_schema=False)
+def rss_feed():
+    base_url = get_site_base_url().rstrip("/")
+    with get_db_session() as db:
+        posts = (
+            db.query(Post)
+            .filter(Post.is_published == True)  # noqa: E712
+            .order_by(Post.created_at.desc())
+            .limit(50)
+            .all()
+        )
+    items = []
+    for p in posts:
+        items.append(
+            f"""
+            <item>
+              <title>{p.title}</title>
+              <link>{base_url}/post/{p.slug}</link>
+              <guid isPermaLink=\"true\">{base_url}/post/{p.slug}</guid>
+              <pubDate>{p.created_at.strftime('%a, %d %b %Y %H:%M:%S +0000')}</pubDate>
+              <description><![CDATA[{p.summary or ''}]]></description>
+            </item>
+            """
+        )
+    rss = f"""
+    <?xml version=\"1.0\" encoding=\"UTF-8\"?>
+    <rss version=\"2.0\">
+      <channel>
+        <title>Blog RSS</title>
+        <link>{base_url}</link>
+        <description>Latest posts</description>
+        {''.join(items)}
+      </channel>
+    </rss>
+    """
+    return Response(content=rss, media_type="application/rss+xml")
+
+
+# Sitemap
+@router.get("/sitemap.xml", include_in_schema=False)
+def sitemap():
+    base_url = get_site_base_url().rstrip("/")
+    static_urls = ["/", "/categories", "/tags"]
+    with get_db_session() as db:
+        posts = db.query(Post).filter(Post.is_published == True).all()  # noqa: E712
+    urls_xml = []
+    for path in static_urls:
+        urls_xml.append(f"<url><loc>{base_url}{path}</loc></url>")
+    for p in posts:
+        urls_xml.append(f"<url><loc>{base_url}/post/{p.slug}</loc></url>")
+    xml = f"""
+    <?xml version=\"1.0\" encoding=\"UTF-8\"?>
+    <urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">
+      {''.join(urls_xml)}
+    </urlset>
+    """
+    return Response(content=xml, media_type="application/xml")
+
+
+@router.get("/robots.txt", include_in_schema=False)
+def robots_txt():
+    base_url = get_site_base_url().rstrip("/")
+    content = f"User-agent: *\nAllow: /\nSitemap: {base_url}/sitemap.xml\n"
+    return Response(content=content, media_type="text/plain")

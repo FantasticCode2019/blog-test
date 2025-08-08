@@ -7,6 +7,8 @@
   <meta name="description" content="{{ meta_description or 'A simple FastAPI blog' }}" />
   <meta property="og:title" content="{{ title or 'Blog' }}" />
   <meta property="og:description" content="{{ meta_description or 'A simple FastAPI blog' }}" />
+  <link rel="alternate" type="application/rss+xml" title="RSS" href="/rss.xml" />
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
   <link rel="stylesheet" href="/static/styles.css" />
   {% block head %}{% endblock %}
 </head>
