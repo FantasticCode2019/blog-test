@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from .database import get_db_session
 from .models import User
+from .deps import require_user
 
 router = APIRouter(include_in_schema=False)
 
@@ -46,7 +47,7 @@ def login(
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        request.session["user"] = {"id": user.id, "username": user.username, "is_admin": user.is_admin}
+        request.session["user"] = {"id": user.id, "username": user.username, "is_admin": user.is_admin, "role": getattr(user, "role", "admin")}
         return RedirectResponse("/admin", status_code=status.HTTP_302_FOUND)
 
 
@@ -54,3 +55,27 @@ def login(
 def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/", status_code=status.HTTP_302_FOUND)
+
+
+@router.get("/admin/profile/password", dependencies=[Depends(require_user)])
+def change_password_form(request: Request):
+    return request.app.state.templates.TemplateResponse(
+        "admin/change_password.html", {"request": request, "title": "Change Password"}
+    )
+
+
+@router.post("/admin/profile/password", dependencies=[Depends(require_user)])
+def change_password(request: Request, current_password: str = Form(...), new_password: str = Form(...)):
+    user_session = request.session.get("user")
+    user_id = user_session.get("id")
+    with get_db_session() as db:
+        user = db.get(User, user_id)
+        if not user or not verify_password(current_password, user.password_hash):
+            return request.app.state.templates.TemplateResponse(
+                "admin/change_password.html",
+                {"request": request, "title": "Change Password", "error": "Current password is incorrect"},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        user.password_hash = hash_password(new_password)
+        db.add(user)
+    return RedirectResponse("/admin", status_code=status.HTTP_302_FOUND)

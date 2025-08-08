@@ -1,4 +1,24 @@
 {% extends 'base.html' %}
+{% block head %}
+  {% if post %}
+  <meta property="og:title" content="{{ post.title }}" />
+  <meta property="og:description" content="{{ post.summary or '' }}" />
+  {% if post.cover_image_url %}
+  <meta property="og:image" content="{{ post.cover_image_url }}" />
+  {% endif %}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": {{ post.title | tojson }},
+    "datePublished": "{{ post.created_at.isoformat() }}",
+    "dateModified": "{{ post.updated_at.isoformat() if post.updated_at else post.created_at.isoformat() }}",
+    "image": {{ post.cover_image_url | tojson }},
+    "description": {{ (post.summary or '') | tojson }}
+  }
+  </script>
+  {% endif %}
+{% endblock %}
 {% block content %}
 {% if error %}
   <h1>Not Found</h1>
@@ -13,7 +33,7 @@
     {% if post.tags %}
       <div class="meta">Tags: {% for t in post.tags %}<a class="tag" href="/tag/{{ t.slug }}">{{ t.name }}</a>{% endfor %}</div>
     {% endif %}
-    <div class="content">{{ post.content | safe }}</div>
+    <div class="content">{{ content_html | safe }}</div>
   </article>
 {% endif %}
 {% endblock %}

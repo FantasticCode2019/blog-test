@@ -30,6 +30,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    role: Mapped[str] = mapped_column(String(20), default="admin", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -66,6 +67,8 @@ class Post(Base):
     slug: Mapped[str] = mapped_column(String(240), nullable=False, index=True)
     summary: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    content_format: Mapped[str] = mapped_column(String(20), default="markdown", nullable=False)  # markdown|html
+    cover_image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     is_published: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
